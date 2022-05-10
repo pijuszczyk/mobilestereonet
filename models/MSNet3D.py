@@ -46,17 +46,17 @@ class hourglass3D(nn.Module):
 
 
 class MSNet3D(nn.Module):
-    def __init__(self, maxdisp):
+    def __init__(self, maxdisp, hourglass_size=32, dres_expanse_ratio=3, num_groups=40, volume_size=0):
 
         super(MSNet3D, self).__init__()
 
         self.maxdisp = maxdisp
 
-        self.hourglass_size = 32
+        self.hourglass_size = hourglass_size
 
-        self.dres_expanse_ratio = 3
+        self.dres_expanse_ratio = dres_expanse_ratio
 
-        self.num_groups = 40
+        self.num_groups = num_groups
 
         self.feature_extraction = feature_extraction()
 

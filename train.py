@@ -35,6 +35,16 @@ parser.add_argument('--seed', type=int, default=1, metavar='S', help='random see
 parser.add_argument('--summary_freq', type=int, default=200, help='the frequency of saving summary')
 parser.add_argument('--save_freq', type=int, default=1, help='the frequency of saving checkpoint')
 
+parser.add_argument('--optimizer', default='Adam', help='select optimizer', choices=['Adam', 'SGD'])
+parser.add_argument('--betas1', type=float, default=0.9, help='optimizer beta 1')
+parser.add_argument('--betas2', type=float, default=0.999, help='optimizer beta 2')
+parser.add_argument('--momentum', type=float, default=0.9, help='optimizer momentum')
+
+parser.add_argument('--hourglass_size', type=int, default=48, help='hourglass_size')
+parser.add_argument('--dres_expanse_ratio', type=int, default=3, help='dres_expanse_ratio')
+parser.add_argument('--num_groups', type=int, default=1, help='num_groups')
+parser.add_argument('--volume_size', type=int, default=48, help='volume_size')
+
 # parse arguments, set seeds
 args = parser.parse_args()
 torch.manual_seed(args.seed)
@@ -59,10 +69,14 @@ TrainImgLoader = DataLoader(train_dataset, args.batch_size, shuffle=True, num_wo
 TestImgLoader = DataLoader(test_dataset, args.test_batch_size, shuffle=False, num_workers=4, drop_last=False)
 
 # model, optimizer
-model = __models__[args.model](args.maxdisp)
+model = __models__[args.model](args.maxdisp, args.hourglass_size, args.dres_expanse_ratio, args.num_groups, args.volume_size)
 model = nn.DataParallel(model)
 model.cuda()
-optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.999))
+
+if args.optimizer == 'Adam':
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(args.betas1, args.betas2))
+else:
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum)
 
 # load parameters
 start_epoch = 0
