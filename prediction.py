@@ -57,7 +57,8 @@ def test(args):
 
             assert len(disp_est.shape) == 2
 
-            disp_est = np.array(disp_est[top_pad:, :-right_pad], dtype=np.float32)
+            if top_pad > 0 and right_pad > 0:
+                disp_est = np.array(disp_est[top_pad:, :-right_pad], dtype=np.float32)
             name = fn.split('/')
             fn = os.path.join("predictions", '_'.join(name[2:]))
 
