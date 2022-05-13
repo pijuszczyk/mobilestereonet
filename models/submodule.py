@@ -68,9 +68,10 @@ def convbn_dws(inp, oup, kernel_size, stride, pad, dilation, second_relu=True):
 class MobileV1_Residual(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride, downsample, pad, dilation):
+    def __init__(self, inplanes, planes, stride, downsample=None, pad=1, dilation=1, use_res=True):
         super(MobileV1_Residual, self).__init__()
 
+        self.use_res = use_res
         self.stride = stride
         self.downsample = downsample
         self.conv1 = convbn_dws(inplanes, planes, 3, stride, pad, dilation)
@@ -83,19 +84,23 @@ class MobileV1_Residual(nn.Module):
         if self.downsample is not None:
             x = self.downsample(x)
 
-        out += x
+        if self.use_res:
+            out += x
 
         return out
 
 
 class MobileV2_Residual(nn.Module):
-    def __init__(self, inp, oup, stride, expanse_ratio, dilation=1):
+    def __init__(self, inp, oup, stride, expanse_ratio, dilation=1, use_res=True):
         super(MobileV2_Residual, self).__init__()
         self.stride = stride
         assert stride in [1, 2]
 
         hidden_dim = int(inp * expanse_ratio)
-        self.use_res_connect = self.stride == 1 and inp == oup
+        if use_res:
+            self.use_res_connect = self.stride == 1 and inp == oup
+        else:
+            self.use_res_connect = False
         pad = dilation
 
         if expanse_ratio == 1:

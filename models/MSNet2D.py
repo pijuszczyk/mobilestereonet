@@ -4,22 +4,31 @@ import math
 import torch.nn as nn
 import torch.utils.data
 import torch.nn.functional as F
-from models.submodule import feature_extraction, MobileV2_Residual, convbn, interweave_tensors, disparity_regression
+from models.submodule import feature_extraction, MobileV2_Residual, convbn, interweave_tensors, disparity_regression, MobileV1_Residual
 
 
 class hourglass2D(nn.Module):
-    def __init__(self, in_channels):
+    def __init__(self, in_channels, use_res=True, use_mobilev1=False):
         super(hourglass2D, self).__init__()
 
         self.expanse_ratio = 2
 
-        self.conv1 = MobileV2_Residual(in_channels, in_channels * 2, stride=2, expanse_ratio=self.expanse_ratio)
+        if use_mobilev1:
+            self.conv1 = MobileV1_Residual(in_channels, in_channels * 2, stride=2, use_res=use_res)
 
-        self.conv2 = MobileV2_Residual(in_channels * 2, in_channels * 2, stride=1, expanse_ratio=self.expanse_ratio)
+            self.conv2 = MobileV1_Residual(in_channels * 2, in_channels * 2, stride=1, use_res=use_res)
 
-        self.conv3 = MobileV2_Residual(in_channels * 2, in_channels * 4, stride=2, expanse_ratio=self.expanse_ratio)
+            self.conv3 = MobileV1_Residual(in_channels * 2, in_channels * 4, stride=2, use_res=use_res)
 
-        self.conv4 = MobileV2_Residual(in_channels * 4, in_channels * 4, stride=1, expanse_ratio=self.expanse_ratio)
+            self.conv4 = MobileV1_Residual(in_channels * 4, in_channels * 4, stride=1, use_res=use_res)
+        else:
+            self.conv1 = MobileV2_Residual(in_channels, in_channels * 2, stride=2, expanse_ratio=self.expanse_ratio, use_res=use_res)
+
+            self.conv2 = MobileV2_Residual(in_channels * 2, in_channels * 2, stride=1, expanse_ratio=self.expanse_ratio, use_res=use_res)
+
+            self.conv3 = MobileV2_Residual(in_channels * 2, in_channels * 4, stride=2, expanse_ratio=self.expanse_ratio, use_res=use_res)
+
+            self.conv4 = MobileV2_Residual(in_channels * 4, in_channels * 4, stride=1, expanse_ratio=self.expanse_ratio, use_res=use_res)
 
         self.conv5 = nn.Sequential(
             nn.ConvTranspose2d(in_channels * 4, in_channels * 2, 3, padding=1, output_padding=1, stride=2, bias=False),
@@ -29,8 +38,12 @@ class hourglass2D(nn.Module):
             nn.ConvTranspose2d(in_channels * 2, in_channels, 3, padding=1, output_padding=1, stride=2, bias=False),
             nn.BatchNorm2d(in_channels))
 
-        self.redir1 = MobileV2_Residual(in_channels, in_channels, stride=1, expanse_ratio=self.expanse_ratio)
-        self.redir2 = MobileV2_Residual(in_channels * 2, in_channels * 2, stride=1, expanse_ratio=self.expanse_ratio)
+        if use_mobilev1:
+            self.redir1 = MobileV1_Residual(in_channels, in_channels, stride=1, use_res=use_res)
+            self.redir2 = MobileV1_Residual(in_channels * 2, in_channels * 2, stride=1, use_res=use_res)
+        else:
+            self.redir1 = MobileV2_Residual(in_channels, in_channels, stride=1, expanse_ratio=self.expanse_ratio, use_res=use_res)
+            self.redir2 = MobileV2_Residual(in_channels * 2, in_channels * 2, stride=1, expanse_ratio=self.expanse_ratio, use_res=use_res)
 
     def forward(self, x):
         conv1 = self.conv1(x)
@@ -46,7 +59,7 @@ class hourglass2D(nn.Module):
 
 
 class MSNet2D(nn.Module):
-    def __init__(self, maxdisp, hourglass_size=48, dres_expanse_ratio=3, num_groups=1, volume_size=48):
+    def __init__(self, maxdisp, hourglass_size=48, dres_expanse_ratio=3, num_groups=1, volume_size=48, use_res=True, use_mobilev1=False):
 
         super(MSNet2D, self).__init__()
 
@@ -83,20 +96,32 @@ class MSNet2D(nn.Module):
         self.volume11 = nn.Sequential(convbn(16, 1, 1, 1, 0, 1),
                                       nn.ReLU(inplace=True))
 
-        self.dres0 = nn.Sequential(MobileV2_Residual(self.volume_size, self.hg_size, 1, self.dres_expanse_ratio),
-                                   nn.ReLU(inplace=True),
-                                   MobileV2_Residual(self.hg_size, self.hg_size, 1, self.dres_expanse_ratio),
-                                   nn.ReLU(inplace=True))
+        if use_mobilev1:
+            self.dres0 = nn.Sequential(
+                MobileV1_Residual(self.volume_size, self.hg_size, 1, use_res=use_res),
+                nn.ReLU(inplace=True),
+                MobileV1_Residual(self.hg_size, self.hg_size, 1, use_res=use_res),
+                nn.ReLU(inplace=True))
 
-        self.dres1 = nn.Sequential(MobileV2_Residual(self.hg_size, self.hg_size, 1, self.dres_expanse_ratio),
-                                   nn.ReLU(inplace=True),
-                                   MobileV2_Residual(self.hg_size, self.hg_size, 1, self.dres_expanse_ratio))
+            self.dres1 = nn.Sequential(
+                MobileV1_Residual(self.hg_size, self.hg_size, 1, use_res=use_res),
+                nn.ReLU(inplace=True),
+                MobileV1_Residual(self.hg_size, self.hg_size, 1, use_res=use_res))
+        else:
+            self.dres0 = nn.Sequential(MobileV2_Residual(self.volume_size, self.hg_size, 1, self.dres_expanse_ratio, use_res=use_res),
+                                       nn.ReLU(inplace=True),
+                                       MobileV2_Residual(self.hg_size, self.hg_size, 1, self.dres_expanse_ratio, use_res=use_res),
+                                       nn.ReLU(inplace=True))
 
-        self.encoder_decoder1 = hourglass2D(self.hg_size)
+            self.dres1 = nn.Sequential(MobileV2_Residual(self.hg_size, self.hg_size, 1, self.dres_expanse_ratio, use_res=use_res),
+                                       nn.ReLU(inplace=True),
+                                       MobileV2_Residual(self.hg_size, self.hg_size, 1, self.dres_expanse_ratio, use_res=use_res))
 
-        self.encoder_decoder2 = hourglass2D(self.hg_size)
+        self.encoder_decoder1 = hourglass2D(self.hg_size, use_res=use_res, use_mobilev1=use_mobilev1)
 
-        self.encoder_decoder3 = hourglass2D(self.hg_size)
+        self.encoder_decoder2 = hourglass2D(self.hg_size, use_res=use_res, use_mobilev1=use_mobilev1)
+
+        self.encoder_decoder3 = hourglass2D(self.hg_size, use_res=use_res, use_mobilev1=use_mobilev1)
 
         self.classif0 = nn.Sequential(convbn(self.hg_size, self.hg_size, 3, 1, 1, 1),
                                       nn.ReLU(inplace=True),
