@@ -26,6 +26,9 @@ parser.add_argument('--dres_expanse_ratio', type=int, default=3, help='dres_expa
 parser.add_argument('--num_groups', type=int, default=1, help='num_groups')
 parser.add_argument('--volume_size', type=int, default=48, help='volume_size')
 
+parser.add_argument('--no_res', action='store_true', help='Do not use residual connections')
+parser.add_argument('--use_mobilev1', action='store_true', help='Use MobileV1 instead of MobileV2 layers')
+
 # parse arguments
 args = parser.parse_args()
 
@@ -35,7 +38,7 @@ test_dataset = StereoDataset(args.datapath, args.testlist, False)
 TestImgLoader = DataLoader(test_dataset, args.test_batch_size, shuffle=False, num_workers=4, drop_last=False)
 
 # model, optimizer
-model = __models__[args.model](args.maxdisp, args.hourglass_size, args.dres_expanse_ratio, args.num_groups, args.volume_size)
+model = __models__[args.model](args.maxdisp, args.hourglass_size, args.dres_expanse_ratio, args.num_groups, args.volume_size, not args.no_res, args.use_mobilev1)
 model = nn.DataParallel(model)
 model.cuda()
 
