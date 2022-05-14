@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from datasets import __datasets__
 from models import __models__, model_loss
 from utils import *
+import pandas as pd
 
 cudnn.benchmark = True
 
@@ -103,11 +104,16 @@ print("Start at epoch {}".format(start_epoch))
 
 
 def train():
+
+    train_scalars = []
+    test_scalars = []
+
     best_checkpoint_loss = 100
     for epoch_idx in range(start_epoch, args.epochs):
         adjust_learning_rate(optimizer, epoch_idx, args.lr, args.lrepochs)
 
         # training
+        avg_train_scalars = AverageMeterDict()
         for batch_idx, sample in enumerate(TrainImgLoader):
             global_step = len(TrainImgLoader) * epoch_idx + batch_idx
             start_time = time.time()
@@ -116,11 +122,17 @@ def train():
             if do_summary:
                 save_scalars(logger, 'train', scalar_outputs, global_step)
                 save_images(logger, 'train', image_outputs, global_step)
+            avg_train_scalars.update(scalar_outputs)
             del scalar_outputs, image_outputs
             print('Epoch {}/{}, Iter {}/{}, train loss = {:.3f}, time = {:.3f}'.format(epoch_idx, args.epochs,
                                                                                        batch_idx,
                                                                                        len(TrainImgLoader), loss,
                                                                                        time.time() - start_time))
+
+        avg_train_scalars = avg_train_scalars.mean()
+        print("avg_train_scalars", avg_train_scalars)
+        train_scalars.append(avg_train_scalars)
+
         # saving checkpoints
         if (epoch_idx + 1) % args.save_freq == 0:
             checkpoint_data = {'epoch': epoch_idx, 'model': model.state_dict(), 'optimizer': optimizer.state_dict()}
@@ -144,9 +156,9 @@ def train():
                                                                                      len(TestImgLoader), loss,
                                                                                      time.time() - start_time))
         avg_test_scalars = avg_test_scalars.mean()
-
         save_scalars(logger, 'fulltest', avg_test_scalars, len(TrainImgLoader) * (epoch_idx + 1))
         print("avg_test_scalars", avg_test_scalars)
+        test_scalars.append(avg_test_scalars)
 
         # saving new best checkpoint
         if avg_test_scalars['loss'] < best_checkpoint_loss:
@@ -157,6 +169,13 @@ def train():
 
         gc.collect()
 
+    train_dataframe = pd.DataFrame(train_scalars)
+    test_dataframe = pd.DataFrame(test_scalars)
+
+    timestr = time.strftime("%Y-%m-%d_%H-%M-%S")
+    os.makedirs(args.logdir, exist_ok=True)
+    train_dataframe.to_csv(os.path.join(args.logdir, 'train_logs_' + timestr + '.csv'))
+    test_dataframe.to_csv(os.path.join(args.logdir, 'test_logs_' + timestr + '.csv'))
 
 # train one sample
 def train_sample(sample, compute_metrics=False):
